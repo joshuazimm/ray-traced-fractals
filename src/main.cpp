@@ -2,20 +2,47 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <thread>
+#include <string>
 
-// Compute shader source
-const char* computeShaderSource = R"(
-    #version 430 core
-    layout (local_size_x = 16, local_size_y = 16) in;
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
-    layout (rgba8, binding = 0) uniform image2D img_output;
+using namespace std;
 
-    void main() {
-        ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
-        vec4 color = vec4(1.0, 0.0, 0.0, 1.0); // Red color
-        imageStore(img_output, pixel_coords, color);
+class Image {
+public:
+    int width, height, comp;
+    vector<unsigned char> pixels;
+
+    Image(int w, int h, int c) : width(w), height(h), comp(c), pixels(w* h* c) {}
+
+    void writeToFile(const string& filename) const;
+};
+
+void Image::writeToFile(const string& filename) const {
+    int stride_in_bytes = width * comp * sizeof(unsigned char);
+    int rc = stbi_write_png(filename.c_str(), width, height, comp, pixels.data(), stride_in_bytes);
+    if (rc) {
+        cout << "Wrote to " << filename << endl;
     }
-)";
+    else {
+        cout << "Couldn't write to " << filename << endl;
+    }
+}
+
+std::string readShaderSource(const std::string& filePath) {
+    std::ifstream file(filePath);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open shader file: " << filePath << std::endl;
+        exit(-1);
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
 
 GLuint compileShader(GLenum type, const char* source) {
     GLuint shader = glCreateShader(type);
@@ -33,8 +60,9 @@ GLuint compileShader(GLenum type, const char* source) {
     return shader;
 }
 
-GLuint createComputeShaderProgram() {
-    GLuint computeShader = compileShader(GL_COMPUTE_SHADER, computeShaderSource);
+GLuint createComputeShaderProgram(const std::string& shaderPath) {
+    std::string computeShaderSource = readShaderSource(shaderPath);
+    GLuint computeShader = compileShader(GL_COMPUTE_SHADER, computeShaderSource.c_str());
 
     GLuint shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, computeShader);
@@ -53,31 +81,32 @@ GLuint createComputeShaderProgram() {
     return shaderProgram;
 }
 
-int main() {
-    // Initialize GLFW
+void initOpenGLContext(GLFWwindow*& window) {
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
-        return -1;
+        exit(-1);
     }
 
-    // Create an OpenGL context (hidden window)
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Off-screen Rendering", NULL, NULL);
+    window = glfwCreateWindow(800, 600, "Off-screen Rendering", NULL, NULL);
     if (!window) {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
-        return -1;
+        exit(-1);
     }
 
     glfwMakeContextCurrent(window);
 
-    // Initialize GLEW
     if (glewInit() != GLEW_OK) {
         std::cerr << "Failed to initialize GLEW" << std::endl;
-        return -1;
+        exit(-1);
     }
+}
 
-    // Set up texture
+int main() {
+    GLFWwindow* window;
+    initOpenGLContext(window);
+
     GLuint texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -85,26 +114,20 @@ int main() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    // Bind texture to image unit 0
     glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
-    // Create compute shader program
-    GLuint shaderProgram = createComputeShaderProgram();
+    GLuint shaderProgram = createComputeShaderProgram("../resources/compute.glsl");
     glUseProgram(shaderProgram);
 
-    // Dispatch compute shader
     glDispatchCompute(800 / 16, 600 / 16, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    // Read pixels
-    std::vector<unsigned char> pixels(800 * 600 * 4);
+    Image image(800, 600, 4);
     glBindTexture(GL_TEXTURE_2D, texture);
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.pixels.data());
 
-    // Save pixels to an image (not implemented in this example)
-    // You can use a library like stb_image_write.h to save the pixels to a file
+    image.writeToFile("output.png");
 
-    // Cleanup
     glDeleteTextures(1, &texture);
     glDeleteProgram(shaderProgram);
 

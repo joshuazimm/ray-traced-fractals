@@ -23,7 +23,7 @@ endforeach()
 # Find all .c and .h files in src directory
 file(GLOB_RECURSE SRC_FILES "${CMAKE_SOURCE_DIR}/src/*.cpp")
 file(GLOB_RECURSE HDR_FILES "${CMAKE_SOURCE_DIR}/src/*.h")
-file(GLOB_RECURSE GLSL_FILES "${CMAKE_SOURCE_DIR}/src/shaders/*.glsl")
+file(GLOB_RECURSE GLSL_FILES "${CMAKE_SOURCE_DIR}/resources/*.glsl")
 
 # Add executable
 add_executable(${PROJECT_NAME} ${SRC_FILES} ${HDR_FILES} ${GLSL_FILES})
