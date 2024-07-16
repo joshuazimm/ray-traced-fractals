@@ -12,6 +12,7 @@ uniform float sphere_radius;
 
 float mandelbulbDistanceEstimator(vec3 p);
 bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out vec3 p);
+bool shadowMarchMandelbulb(vec3 p, vec3 light_dir);
 vec3 calculateNormal(vec3 p);
 
 void main() {
@@ -22,28 +23,33 @@ void main() {
     vec4 view_space_coords = inverse(projection_matrix) * clip_space_coords;
     view_space_coords /= view_space_coords.w;
     vec3 ray_direction = normalize(mat3(view_matrix) * view_space_coords.xyz);
-    
+
     float t;
     vec3 p;
     if (rayMarchMandelbulb(camera_position, ray_direction, t, p)) {
         vec3 normal = calculateNormal(p);
 
-        // Calculate lighting (simple diffuse shading)
+        // TODO: non static lighting
         vec3 light_dir = normalize(vec3(1.0, 1.0, 1.0));
+        vec3 light_pos = vec3(2.0, 2.0, 2.0);
         float diffuse = max(dot(normal, light_dir), 0.0);
 
+        // Check self shadow then apply shadow factor
+        if (shadowMarchMandelbulb(p, light_dir)) { diffuse *= 0.2; }
+
         // Calculate color based on depth (t value) and diffuse shading
-        float depth = exp(-0.2 * t); // Adjust exponential decay for color variation
-        vec4 color = vec4(depth * vec3(1.0, 0.2, 0.8) * diffuse, 1.0);  // Example: depth-based coloring with shading
+        vec4 color = vec4(t * vec3(1.0, 0.5, 0.2) * diffuse, 1.0);  // Example: depth-based coloring with shading
 
         imageStore(img_output, pixel_coords, color);
-    } else {
+    }
+    else {
         vec4 color = vec4(0.0, 0.0, 0.0, 1.0);  // Black color for no intersection
         imageStore(img_output, pixel_coords, color);
     }
 }
 
 float mandelbulbDistanceEstimator(vec3 p) {
+    // mandelbulb constants
     vec3 z = p;
     float dr = 1.0;
     float r = 0.0;
@@ -83,6 +89,7 @@ vec3 calculateNormal(vec3 p) {
     return normalize(n);
 }
 
+// out instead of passing by reference in glsl
 bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out vec3 p) {
     float max_distance = 100.0;
     float min_distance = 0.002;
@@ -101,4 +108,24 @@ bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out ve
     }
 
     return false;
+}
+
+bool shadowMarchMandelbulb(vec3 p, vec3 light_dir) {
+    float t = 0.01;  // Start just above the surface to avoid self-intersection
+    float max_distance = 100.0;
+    const float min_distance = 0.002;
+
+    for (int i = 0; i < 100; i++) {
+        vec3 pos = p + t * light_dir;
+        float dist = mandelbulbDistanceEstimator(pos);
+        if (dist < min_distance) {
+            return true;  // In shadow
+        }
+        t += dist;
+        if (t > max_distance) {
+            break;  // No shadow
+        }
+    }
+
+    return false;  // No shadow
 }
