@@ -39,12 +39,15 @@ foreach(GLSL_FILE ${GLSL_FILES})
     configure_file(${GLSL_FILE} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${GLSL_FILE_NAME} COPYONLY)
 endforeach()
 
+add_library(lodepng ${CMAKE_SOURCE_DIR}/dep/lodepng/lodepng.cpp)
+
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/dep/glfw/include
     ${CMAKE_SOURCE_DIR}/dep/glew/include
     ${CMAKE_SOURCE_DIR}/dep/glm/include
+    ${CMAKE_SOURCE_DIR}/dep/lodepng/
 )
 
 # Dependencies
@@ -64,4 +67,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glfw
     libglew_static
     glm
+    lodepng
 )

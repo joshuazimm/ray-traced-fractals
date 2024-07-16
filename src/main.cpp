@@ -9,9 +9,7 @@
 #include <sstream>
 #include <string>
 #include <chrono>
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "lodepng.h"
 
 const int IMG_HEIGHT = 4048;
 const int IMG_WIDTH = 4048;
@@ -21,19 +19,20 @@ public:
     int width, height, comp;
     std::vector<unsigned char> pixels;
 
-    Image(int w, int h, int c) : width(w), height(h), comp(c), pixels(w* h* c) {}
+    Image(int w, int h, int c) : width(w), height(h), comp(c), pixels(w * h * c) {}
 
     void writeToFile(const std::string& filename) const;
 };
 
 void Image::writeToFile(const std::string& filename) const {
-    int stride_in_bytes = width * comp * sizeof(unsigned char);
-    int rc = stbi_write_png(filename.c_str(), width, height, comp, pixels.data(), stride_in_bytes);
-    if (rc) {
+    std::vector<unsigned char> png;
+    unsigned error = lodepng::encode(png, pixels, width, height);
+
+    if (!error) {
+        lodepng::save_file(png, filename);
         std::cout << "Wrote to " << filename << std::endl;
-    }
-    else {
-        std::cout << "Couldn't write to " << filename << std::endl;
+    } else {
+        std::cout << "Error " << error << ": " << lodepng_error_text(error) << std::endl;
     }
 }
 
