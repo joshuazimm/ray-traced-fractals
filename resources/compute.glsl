@@ -7,9 +7,6 @@ uniform vec3 camera_position;
 uniform mat4 projection_matrix;
 uniform mat4 view_matrix;
 
-uniform vec3 sphere_center;
-uniform float sphere_radius;
-
 float mandelbulbDistanceEstimator(vec3 p);
 bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out vec3 p, out int iterationCount);
 bool shadowMarchMandelbulb(vec3 p, vec3 light_dir);
@@ -24,7 +21,7 @@ void main() {
     vec4 clip_space_coords = vec4(ndc_coords * 2.0 - 1.0, -1.0, 1.0);
     vec4 view_space_coords = inverse(projection_matrix) * clip_space_coords;
     view_space_coords /= view_space_coords.w;
-    vec3 ray_direction = normalize(mat3(view_matrix) * view_space_coords.xyz);
+    vec3 ray_direction = normalize((inverse(view_matrix) * vec4(view_space_coords.xyz, 0.0)).xyz);
 
     float t;
     vec3 p;
@@ -43,7 +40,8 @@ void main() {
         if (shadowMarchMandelbulb(p, light_dir)) { color *= 0.2; }
 
         imageStore(img_output, pixel_coords, vec4(color, 1.0));
-    } else {
+    }
+    else {
         vec4 color = vec4(0.0, 0.0, 0.0, 1.0);  // Black color for no intersection
         imageStore(img_output, pixel_coords, color);
     }
@@ -54,7 +52,7 @@ float mandelbulbDistanceEstimator(vec3 p) {
     float dr = 1.0;
     float r = 0.0;
     const int iterations = 30;
-    const float power = 10.0;
+    const float power = 30.0;
 
     for (int i = 0; i < iterations; i++) {
         r = length(z);
