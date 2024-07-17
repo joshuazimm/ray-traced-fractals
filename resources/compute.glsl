@@ -8,6 +8,8 @@ uniform mat4 projection_matrix;
 uniform mat4 view_matrix;
 
 float mandelbulbDistanceEstimator(vec3 p);
+float juliaDistanceEstimator(vec3 p);
+float sierpinskiDistanceEstimator(vec3 p);
 bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out vec3 p, out int iterationCount);
 bool shadowMarchMandelbulb(vec3 p, vec3 light_dir);
 vec3 calculateNormal(vec3 p);
@@ -73,26 +75,64 @@ float mandelbulbDistanceEstimator(vec3 p) {
     return 0.5 * log(r) * r / dr;
 }
 
+float juliaDistanceEstimator(vec3 p) {
+    vec4 z = vec4(p, 0.0);
+    vec4 c = vec4(-0.8, 0.156, 0.0, 0.0); // This is a parameter that can be changed to get different Julia sets
+    float dr = 1.0;
+    float r = 0.0;
+
+    const int iterations = 100;
+    for (int i = 0; i < iterations; i++) {
+        r = length(z);
+        if (r > 2.0) break;
+
+        // Quaternion multiplication z = z^2 + c
+        float zr = z.x * z.x - z.y * z.y - z.z * z.z - z.w * z.w;
+        float zi = 2.0 * z.x * z.y;
+        float zj = 2.0 * z.x * z.z;
+        float zk = 2.0 * z.x * z.w;
+        z = vec4(zr, zi, zj, zk) + c;
+
+        dr = 2.0 * r * dr + 1.0;
+    }
+    return 0.5 * log(r) * r / dr;
+}
+
+float sierpinskiDistanceEstimator(vec3 p) {
+    const int iterations = 50;
+    const float scale = 2.0;
+    const vec3 scaleVec = vec3(scale);
+
+    for (int i = 0; i < iterations; i++) {
+        if (p.x + p.y < 0.0) p.xy = -p.yx;
+        if (p.x + p.z < 0.0) p.xz = -p.zx;
+        if (p.y + p.z < 0.0) p.yz = -p.zy;
+        p = p * scaleVec - vec3(scale - 1.0);
+    }
+
+    return length(p) * pow(scale, -float(iterations));
+}
+
 vec3 calculateNormal(vec3 p) {
     float eps = 0.001;
-    float d = mandelbulbDistanceEstimator(p);
+    float d = sierpinskiDistanceEstimator(p);
     vec3 n = vec3(
-        mandelbulbDistanceEstimator(p + vec3(eps, 0.0, 0.0)) - d,
-        mandelbulbDistanceEstimator(p + vec3(0.0, eps, 0.0)) - d,
-        mandelbulbDistanceEstimator(p + vec3(0.0, 0.0, eps)) - d
+        sierpinskiDistanceEstimator(p + vec3(eps, 0.0, 0.0)) - d,
+        sierpinskiDistanceEstimator(p + vec3(0.0, eps, 0.0)) - d,
+        sierpinskiDistanceEstimator(p + vec3(0.0, 0.0, eps)) - d
     );
     return normalize(n);
 }
 
 bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out vec3 p, out int iterationCount) {
     float max_distance = 100.0;
-    float min_distance = 0.002;
+    float min_distance = 0.00001;
     t = 0.0;
     iterationCount = 0;
 
     for (int i = 0; i < 100; i++) {
         p = ray_origin + t * ray_direction;
-        float dist = mandelbulbDistanceEstimator(p);
+        float dist = sierpinskiDistanceEstimator(p);
         if (dist < min_distance) {
             iterationCount = i;
             return true;
@@ -109,11 +149,11 @@ bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out ve
 bool shadowMarchMandelbulb(vec3 p, vec3 light_dir) {
     float t = 0.005;  // Start just above the surface to avoid self-intersection
     float max_distance = 100.0;
-    const float min_distance = 0.002;
+    const float min_distance = 0.00001;
 
     for (int i = 0; i < 100; i++) {
         vec3 pos = p + t * light_dir;
-        float dist = mandelbulbDistanceEstimator(pos);
+        float dist = sierpinskiDistanceEstimator(pos);
         if (dist < min_distance) {
             return true;  // In shadow
         }
@@ -127,9 +167,10 @@ bool shadowMarchMandelbulb(vec3 p, vec3 light_dir) {
 }
 
 vec3 getIterationColor(int iteration, int maxIteration) {
-    float t = float(iteration) / float(maxIteration);
-    float colorIndex = smoothstep(0.0, 1.0, t);
-    return vec3(sin(2.0 * 3.14159 * colorIndex), sin(2.0 * 3.14159 * (colorIndex + 0.33)), sin(2.0 * 3.14159 * (colorIndex + 0.67)));
+    //float t = float(iteration) / float(maxIteration);
+    //float colorIndex = smoothstep(0.0, 1.0, t);
+    //return vec3(sin(2.0 * 3.14159 * colorIndex), sin(2.0 * 3.14159 * (colorIndex + 0.33)), sin(2.0 * 3.14159 * (colorIndex + 0.67)));
+    return vec3(1.0, 0.5, 0.2);
 }
 
 vec3 blinnPhongShading(vec3 normal, vec3 lightDir, vec3 viewDir, vec3 lightColor, vec3 baseColor) {

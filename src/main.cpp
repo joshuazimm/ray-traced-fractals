@@ -20,7 +20,7 @@ const int IMG_WIDTH = 1920;
 
 // Movement settings
 bool keys[1024] = { 0 };
-const float deltaTime = 0.01f; // wasd velocity
+const float deltaTime = 0.001f; // wasd velocity
 const float sensitivity = 0.1; // mouse velocity
 
 class Image {
@@ -156,7 +156,7 @@ void initOpenGLContext(GLFWwindow*& window, bool invisible) {
         exit(-1);
     }
 
-    camera.setPosition(glm::vec3(0.0f, 0.0f, 2.0f));
+    camera.setPosition(glm::vec3(0.0f, 0.0f, 1.0f));
 
     if (invisible) {
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
