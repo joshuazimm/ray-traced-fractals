@@ -55,6 +55,7 @@ add_subdirectory(dep/glfw)
 add_subdirectory(dep/glew)
 add_subdirectory(dep/glm)
 
+set_property(TARGET lodepng PROPERTY FOLDER "Libs")
 set_property(TARGET glm PROPERTY FOLDER "Libs")
 set_property(TARGET libglew_shared PROPERTY FOLDER "Libs")
 set_property(TARGET libglew_static PROPERTY FOLDER "Libs")

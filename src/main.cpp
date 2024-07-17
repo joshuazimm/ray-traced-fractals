@@ -11,8 +11,8 @@
 #include <chrono>
 #include "lodepng.h"
 
-const int IMG_HEIGHT = 6000;
-const int IMG_WIDTH = 6000;
+const int IMG_HEIGHT = 4048;
+const int IMG_WIDTH = 4048;
 
 class Image {
 public:
@@ -123,8 +123,8 @@ int main() {
     glUseProgram(shaderProgram);
 
     // Camera properties
-    glm::vec3 camera_position(0.0f, 1.5f, 1.5f);
-    glm::vec3 camera_direction(0.0f, 1.0f, -1.0f);
+    glm::vec3 camera_position(0.0f, 0.0f, 2.0f);
+    glm::vec3 camera_direction(0.0f, 0.0f, -1.0f);
     float aspect_ratio = (float) IMG_WIDTH / (float) IMG_HEIGHT;
     
     // Sphere properties

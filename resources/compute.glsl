@@ -11,9 +11,11 @@ uniform vec3 sphere_center;
 uniform float sphere_radius;
 
 float mandelbulbDistanceEstimator(vec3 p);
-bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out vec3 p);
+bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out vec3 p, out int iterationCount);
 bool shadowMarchMandelbulb(vec3 p, vec3 light_dir);
 vec3 calculateNormal(vec3 p);
+vec3 getIterationColor(int iteration, int maxIteration);
+vec3 blinnPhongShading(vec3 normal, vec3 lightDir, vec3 viewDir, vec3 lightColor, vec3 baseColor);
 
 void main() {
     ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
@@ -26,51 +28,46 @@ void main() {
 
     float t;
     vec3 p;
-    if (rayMarchMandelbulb(camera_position, ray_direction, t, p)) {
+    int iterationCount;
+    if (rayMarchMandelbulb(camera_position, ray_direction, t, p, iterationCount)) {
         vec3 normal = calculateNormal(p);
 
-        // TODO: non static lighting
         vec3 light_dir = normalize(vec3(1.0, 1.0, 1.0));
-        vec3 light_pos = vec3(2.0, 2.0, 2.0);
-        float diffuse = max(dot(normal, light_dir), 0.0);
+        vec3 light_color = vec3(1.0);
+        vec3 view_dir = normalize(camera_position - p);
+        vec3 base_color = getIterationColor(iterationCount, 100);
 
-        // Check self shadow then apply shadow factor
-        if (shadowMarchMandelbulb(p, light_dir)) { diffuse *= 0.2; }
+        vec3 color = blinnPhongShading(normal, light_dir, view_dir, light_color, base_color);
 
-        // Calculate color based on depth (t value) and diffuse shading
-        vec4 color = vec4(t * vec3(1.0, 0.5, 0.2) * diffuse, 1.0);  // Example: depth-based coloring with shading
+        // Check self shadow and apply shadow factor
+        if (shadowMarchMandelbulb(p, light_dir)) { color *= 0.2; }
 
-        imageStore(img_output, pixel_coords, color);
-    }
-    else {
+        imageStore(img_output, pixel_coords, vec4(color, 1.0));
+    } else {
         vec4 color = vec4(0.0, 0.0, 0.0, 1.0);  // Black color for no intersection
         imageStore(img_output, pixel_coords, color);
     }
 }
 
 float mandelbulbDistanceEstimator(vec3 p) {
-    // mandelbulb constants
     vec3 z = p;
     float dr = 1.0;
     float r = 0.0;
-    const int iterations = 10;
-    const float power = 8.0;
+    const int iterations = 30;
+    const float power = 10.0;
 
     for (int i = 0; i < iterations; i++) {
         r = length(z);
         if (r > 2.0) break;
 
-        // Convert to polar coordinates
         float theta = acos(z.z / r);
         float phi = atan(z.y, z.x);
         dr = pow(r, power - 1.0) * power * dr + 1.0;
 
-        // Scale and rotate the point
         float zr = pow(r, power);
         theta = theta * power;
         phi = phi * power;
 
-        // Convert back to cartesian coordinates
         z = zr * vec3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
         z += p;
     }
@@ -89,16 +86,17 @@ vec3 calculateNormal(vec3 p) {
     return normalize(n);
 }
 
-// out instead of passing by reference in glsl
-bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out vec3 p) {
+bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out vec3 p, out int iterationCount) {
     float max_distance = 100.0;
     float min_distance = 0.002;
     t = 0.0;
+    iterationCount = 0;
 
     for (int i = 0; i < 100; i++) {
         p = ray_origin + t * ray_direction;
         float dist = mandelbulbDistanceEstimator(p);
         if (dist < min_distance) {
+            iterationCount = i;
             return true;
         }
         t += dist;
@@ -111,7 +109,7 @@ bool rayMarchMandelbulb(vec3 ray_origin, vec3 ray_direction, out float t, out ve
 }
 
 bool shadowMarchMandelbulb(vec3 p, vec3 light_dir) {
-    float t = 0.01;  // Start just above the surface to avoid self-intersection
+    float t = 0.005;  // Start just above the surface to avoid self-intersection
     float max_distance = 100.0;
     const float min_distance = 0.002;
 
@@ -128,4 +126,22 @@ bool shadowMarchMandelbulb(vec3 p, vec3 light_dir) {
     }
 
     return false;  // No shadow
+}
+
+vec3 getIterationColor(int iteration, int maxIteration) {
+    float t = float(iteration) / float(maxIteration);
+    float colorIndex = smoothstep(0.0, 1.0, t);
+    return vec3(sin(2.0 * 3.14159 * colorIndex), sin(2.0 * 3.14159 * (colorIndex + 0.33)), sin(2.0 * 3.14159 * (colorIndex + 0.67)));
+}
+
+vec3 blinnPhongShading(vec3 normal, vec3 lightDir, vec3 viewDir, vec3 lightColor, vec3 baseColor) {
+    vec3 ambient = 0.1 * baseColor;
+    float diff = max(dot(normal, lightDir), 0.0);
+    vec3 diffuse = diff * lightColor * baseColor;
+
+    vec3 halfwayDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);
+    vec3 specular = spec * lightColor;
+
+    return ambient + diffuse + specular;
 }
